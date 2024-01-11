@@ -3,13 +3,13 @@ package main
 import (
 	"log"
 
-	"github.com/appleboy/go-fcm"
+	"github.com/XCar-Mobile/go-fcm"
 )
 
 func main() {
 	// Create the message to be sent.
-	msg := &fcm.Message{
-		To: "sample_device_token",
+	msg := fcm.Message{
+		Topic: "sample_device_token",
 		Data: map[string]interface{}{
 			"foo": "bar",
 		},
@@ -18,15 +18,17 @@ func main() {
 			Body:  "body",
 		},
 	}
+	newMsg := &fcm.NewMessage{Message: msg}
 
 	// Create a FCM client to send the message.
-	client, err := fcm.NewClient("sample_api_key")
+	client, err := fcm.NewClient("project_id")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	// Send the message and receive the response without retries.
-	response, err := client.Send(msg)
+	token := "oauth_token"
+	response, err := client.Send(newMsg, token)
 	if err != nil {
 		log.Fatalln(err)
 	}

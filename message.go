@@ -41,7 +41,8 @@ type Notification struct {
 // Message represents list of targets, options, and payload for HTTP JSON
 // messages.
 type Message struct {
-	To                    string                 `json:"to,omitempty"`
+	Topic                 string                 `json:"topic,omitempty"` // Changed from "to" to "topic"
+	Token                 string                 `json:"token,omitempty"`
 	RegistrationIDs       []string               `json:"registration_ids,omitempty"`
 	Condition             string                 `json:"condition,omitempty"`
 	CollapseKey           string                 `json:"collapse_key,omitempty"`
@@ -57,23 +58,27 @@ type Message struct {
 	Webpush               map[string]interface{} `json:"webpush,omitempty"`
 }
 
+type NewMessage struct {
+	Message Message `json:"message"`
+}
+
 // Validate returns an error if the message is not well-formed.
-func (msg *Message) Validate() error {
+func (msg *NewMessage) Validate() error {
 	if msg == nil {
 		return ErrInvalidMessage
 	}
 
-	// validate target identifier: `to` or `condition`, or `registration_ids`
-	opCnt := strings.Count(msg.Condition, "&&") + strings.Count(msg.Condition, "||")
-	if msg.To == "" && (msg.Condition == "" || opCnt > 5) && len(msg.RegistrationIDs) == 0 {
+	// validate target identifier: `token`, `topic`, or `condition`
+	opCnt := strings.Count(msg.Message.Condition, "&&") + strings.Count(msg.Message.Condition, "||")
+	if msg.Message.Token == "" && msg.Message.Topic == "" && (msg.Message.Condition == "" || opCnt > 5) {
 		return ErrInvalidTarget
 	}
 
-	if len(msg.RegistrationIDs) > 1000 {
+	if len(msg.Message.RegistrationIDs) > 1000 {
 		return ErrToManyRegIDs
 	}
 
-	if msg.TimeToLive != nil && *msg.TimeToLive > uint(2419200) {
+	if msg.Message.TimeToLive != nil && *msg.Message.TimeToLive > uint(2419200) {
 		return ErrInvalidTimeToLive
 	}
 	return nil

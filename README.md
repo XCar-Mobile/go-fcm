@@ -21,13 +21,13 @@ More information on [Firebase Cloud Messaging](https://firebase.google.com/docs/
 To install fcm, use `go get`:
 
 ```bash
-go get github.com/appleboy/go-fcm
+go get github.com/XCar-Mobile/go-fcm
 ```
 
 or `govendor`:
 
 ```bash
-govendor fetch github.com/appleboy/go-fcm
+govendor fetch github.com/XCar-Mobile/go-fcm
 ```
 
 or other tool for vendoring.
@@ -42,30 +42,32 @@ package main
 import (
 	"log"
 
-	"github.com/appleboy/go-fcm"
+	"github.com/XCar-Mobile/go-fcm"
 )
 
 func main() {
 	// Create the message to be sent.
-	msg := &fcm.Message{
-		To: "sample_device_token",
+	msg := fcm.Message{
+		Topic: "sample_device_token",
 		Data: map[string]interface{}{
 			"foo": "bar",
 		},
 		Notification: &fcm.Notification{
 			Title: "title",
-			Body: "body",
+			Body:  "body",
 		},
 	}
+	newMsg := &fcm.NewMessage{Message: msg}
 
 	// Create a FCM client to send the message.
-	client, err := fcm.NewClient("sample_api_key")
+	client, err := fcm.NewClient("project_id")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	// Send the message and receive the response without retries.
-	response, err := client.Send(msg)
+	token := "oauth_token"
+	response, err := client.Send(newMsg, token)
 	if err != nil {
 		log.Fatalln(err)
 	}

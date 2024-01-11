@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,15 +11,10 @@ import (
 
 const (
 	// DefaultEndpoint contains endpoint URL of FCM service.
-	DefaultEndpoint = "https://fcm.googleapis.com/fcm/send"
+	DefaultEndpoint = "https://fcm.googleapis.com/v1/projects/%s/messages:send"
 
 	// DefaultTimeout duration in second
 	DefaultTimeout time.Duration = 30 * time.Second
-)
-
-var (
-	// ErrInvalidAPIKey occurs if API key is not set.
-	ErrInvalidAPIKey = errors.New("client API Key is invalid")
 )
 
 // Client abstracts the interaction between the application server and the
@@ -32,7 +26,6 @@ var (
 // If the `HTTP` field is nil, a zeroed http.Client will be allocated and used
 // to send messages.
 type Client struct {
-	apiKey   string
 	client   *http.Client
 	endpoint string
 	timeout  time.Duration
@@ -40,13 +33,9 @@ type Client struct {
 
 // NewClient creates new Firebase Cloud Messaging Client based on API key and
 // with default endpoint and http client.
-func NewClient(apiKey string, opts ...Option) (*Client, error) {
-	if apiKey == "" {
-		return nil, ErrInvalidAPIKey
-	}
+func NewClient(projectId string, opts ...Option) (*Client, error) {
 	c := &Client{
-		apiKey:   apiKey,
-		endpoint: DefaultEndpoint,
+		endpoint: fmt.Sprintf(DefaultEndpoint, projectId),
 		client:   &http.Client{},
 		timeout:  DefaultTimeout,
 	}
@@ -63,7 +52,7 @@ func NewClient(apiKey string, opts ...Option) (*Client, error) {
 // unavailability. A non-nil error is returned if a non-recoverable error
 // occurs (i.e. if the response status is not "200 OK").
 // Behaves just like regular send, but uses external context.
-func (c *Client) SendWithContext(ctx context.Context, msg *Message) (*Response, error) {
+func (c *Client) SendWithContext(ctx context.Context, accessToken string, msg *NewMessage) (*Response, error) {
 	// validate
 	if err := msg.Validate(); err != nil {
 		return nil, err
@@ -75,29 +64,29 @@ func (c *Client) SendWithContext(ctx context.Context, msg *Message) (*Response, 
 		return nil, err
 	}
 
-	return c.send(ctx, data)
+	return c.send(ctx, accessToken, data)
 }
 
 // Send sends a message to the FCM server without retrying in case of service
 // unavailability. A non-nil error is returned if a non-recoverable error
 // occurs (i.e. if the response status is not "200 OK").
-func (c *Client) Send(msg *Message) (*Response, error) {
+func (c *Client) Send(msg *NewMessage, accessToken string) (*Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 
-	return c.SendWithContext(ctx, msg)
+	return c.SendWithContext(ctx, accessToken, msg)
 }
 
 // SendWithRetry sends a message to the FCM server with defined number of
 // retrying in case of temporary error.
-func (c *Client) SendWithRetry(msg *Message, retryAttempts int) (*Response, error) {
-	return c.SendWithRetryWithContext(context.Background(), msg, retryAttempts)
+func (c *Client) SendWithRetry(msg *NewMessage, accessToken string, retryAttempts int) (*Response, error) {
+	return c.SendWithRetryWithContext(context.Background(), msg, accessToken, retryAttempts)
 }
 
 // SendWithRetryWithContext sends a message to the FCM server with defined number of
 // retrying in case of temporary error.
 // Behaves just like regular SendWithRetry, but uses external context.
-func (c *Client) SendWithRetryWithContext(ctx context.Context, msg *Message, retryAttempts int) (*Response, error) {
+func (c *Client) SendWithRetryWithContext(ctx context.Context, msg *NewMessage, accessToken string, retryAttempts int) (*Response, error) {
 	// validate
 	if err := msg.Validate(); err != nil {
 		return nil, err
@@ -113,7 +102,7 @@ func (c *Client) SendWithRetryWithContext(ctx context.Context, msg *Message, ret
 		ctx, cancel := context.WithTimeout(ctx, c.timeout)
 		defer cancel()
 		var er error
-		resp, er = c.send(ctx, data)
+		resp, er = c.send(ctx, accessToken, data)
 		return er
 	}, retryAttempts)
 	if err != nil {
@@ -124,7 +113,7 @@ func (c *Client) SendWithRetryWithContext(ctx context.Context, msg *Message, ret
 }
 
 // send sends a request.
-func (c *Client) send(ctx context.Context, data []byte) (*Response, error) {
+func (c *Client) send(ctx context.Context, accessToken string, data []byte) (*Response, error) {
 	// create request
 	req, err := http.NewRequest("POST", c.endpoint, bytes.NewBuffer(data))
 	if err != nil {
@@ -134,7 +123,7 @@ func (c *Client) send(ctx context.Context, data []byte) (*Response, error) {
 	req = req.WithContext(ctx)
 
 	// add headers
-	req.Header.Add("Authorization", fmt.Sprintf("key=%s", c.apiKey))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	req.Header.Add("Content-Type", "application/json")
 
 	// execute request

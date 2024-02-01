@@ -12,8 +12,8 @@ import (
 func TestSend(t *testing.T) {
 	t.Run("send=success", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Header().Set("Content-Type", "application/json")
@@ -29,16 +29,16 @@ func TestSend(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client, err := NewClient("test", WithEndpoint(server.URL), WithTimeout(10*time.Second))
+		client, err := NewClient("project_id", WithEndpoint(server.URL), WithTimeout(10*time.Second))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.Send(&Message{
-			To: "test",
+		resp, err := client.Send(&NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		})
+		}}, "token")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -52,8 +52,8 @@ func TestSend(t *testing.T) {
 
 	t.Run("send=success", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Header().Set("Content-Type", "application/json")
@@ -73,12 +73,12 @@ func TestSend(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.Send(&Message{
-			To: "test",
+		resp, err := client.Send(&NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		})
+		}}, "token")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -92,8 +92,8 @@ func TestSend(t *testing.T) {
 
 	t.Run("send=failure", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusBadRequest)
 		}))
@@ -103,12 +103,12 @@ func TestSend(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.Send(&Message{
-			To: "test",
+		resp, err := client.Send(&NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		})
+		}}, "token")
 		if err == nil {
 			t.Fatal("expected error but got nil")
 		}
@@ -130,7 +130,7 @@ func TestSend(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		_, err = c.Send(&Message{})
+		_, err = c.Send(&NewMessage{Message: Message{}}, "test")
 		if err == nil {
 			t.Fatal("expected error but go nil")
 		}
@@ -138,8 +138,8 @@ func TestSend(t *testing.T) {
 
 	t.Run("send=invalid-response", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Header().Set("Content-Type", "application/json")
@@ -155,19 +155,21 @@ func TestSend(t *testing.T) {
 		}))
 		defer server.Close()
 
-		client, err := NewClient("test",
+		client, err := NewClient("project_id",
 			WithEndpoint(server.URL),
 			WithHTTPClient(&http.Client{}),
 		)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.Send(&Message{
-			To: "test",
-			Data: map[string]interface{}{
-				"foo": "bar",
-			},
-		})
+		token := "token"
+		resp, err := client.SendWithRetry(&NewMessage{
+			Message: Message{
+				Topic: "test",
+				Data: map[string]interface{}{
+					"foo": "bar",
+				},
+			}}, token, 3)
 		if err == nil {
 			t.Fatal("expected error but go nil")
 		}
@@ -181,8 +183,8 @@ func TestSend(t *testing.T) {
 func TestSendWithRetry(t *testing.T) {
 	t.Run("send_with_retry=success", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Header().Set("Content-Type", "application/json")
@@ -205,12 +207,14 @@ func TestSendWithRetry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.SendWithRetry(&Message{
-			To: "test",
-			Data: map[string]interface{}{
-				"foo": "bar",
-			},
-		}, 3)
+		token := "token"
+		resp, err := client.SendWithRetry(&NewMessage{
+			Message: Message{
+				Topic: "test",
+				Data: map[string]interface{}{
+					"foo": "bar",
+				},
+			}}, token, 3)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -224,8 +228,8 @@ func TestSendWithRetry(t *testing.T) {
 
 	t.Run("send_with_retry=failure", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusBadRequest)
 		}))
@@ -238,12 +242,12 @@ func TestSendWithRetry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.SendWithRetry(&Message{
-			To: "test",
+		resp, err := client.SendWithRetry(&NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 2)
+		}}, "token", 2)
 
 		if err == nil {
 			t.Fatal("expected error\ngot nil")
@@ -257,8 +261,8 @@ func TestSendWithRetry(t *testing.T) {
 		var attempts int
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			attempts++
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			if attempts < 3 {
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -286,12 +290,12 @@ func TestSendWithRetry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.SendWithRetry(&Message{
-			To: "test",
+		resp, err := client.SendWithRetry(&NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 4)
+		}}, "token", 4)
 
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -318,12 +322,12 @@ func TestSendWithRetry(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		resp, err := client.SendWithRetry(&Message{
-			To: "test",
+		resp, err := client.SendWithRetry(&NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 3)
+		}}, "token", 3)
 
 		if err == nil {
 			t.Fatal("expected error\ngot nil")
@@ -337,8 +341,8 @@ func TestSendWithRetry(t *testing.T) {
 func TestSendWithRetryWithContext(t *testing.T) {
 	t.Run("send_with_retry_with_context=success", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Header().Set("Content-Type", "application/json")
@@ -363,12 +367,12 @@ func TestSendWithRetryWithContext(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		resp, err := client.SendWithRetryWithContext(ctx, &Message{
-			To: "test",
+		resp, err := client.SendWithRetryWithContext(ctx, &NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 3)
+		}}, "token", 3)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -382,8 +386,8 @@ func TestSendWithRetryWithContext(t *testing.T) {
 
 	t.Run("send_with_retry_with_context=failure", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusBadRequest)
 		}))
@@ -398,12 +402,12 @@ func TestSendWithRetryWithContext(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		resp, err := client.SendWithRetryWithContext(ctx, &Message{
-			To: "test",
+		resp, err := client.SendWithRetryWithContext(ctx, &NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 2)
+		}}, "token", 2)
 
 		if err == nil {
 			t.Fatal("expected error\ngot nil")
@@ -417,8 +421,8 @@ func TestSendWithRetryWithContext(t *testing.T) {
 		var attempts int
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			attempts++
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			if attempts < 3 {
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -448,12 +452,12 @@ func TestSendWithRetryWithContext(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		resp, err := client.SendWithRetryWithContext(ctx, &Message{
-			To: "test",
+		resp, err := client.SendWithRetryWithContext(ctx, &NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 4)
+		}}, "token", 4)
 
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -482,12 +486,12 @@ func TestSendWithRetryWithContext(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		resp, err := client.SendWithRetryWithContext(ctx, &Message{
-			To: "test",
+		resp, err := client.SendWithRetryWithContext(ctx, &NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 3)
+		}}, "token", 3)
 
 		if err == nil {
 			t.Fatal("expected error\ngot nil")
@@ -501,8 +505,8 @@ func TestSendWithRetryWithContext(t *testing.T) {
 		var attempts int
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 			attempts++
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			if attempts < 3 {
 				rw.WriteHeader(http.StatusInternalServerError)
@@ -530,12 +534,12 @@ func TestSendWithRetryWithContext(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
 		defer cancel()
-		_, err = client.SendWithRetryWithContext(ctx, &Message{
-			To: "test",
+		_, err = client.SendWithRetryWithContext(ctx, &NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		}, 4)
+		}}, "token", 4)
 		if err == nil {
 			t.Fatalf("no context timeout")
 		}
@@ -554,8 +558,8 @@ func TestSendWithRetryWithContext(t *testing.T) {
 func TestSendWithContext(t *testing.T) {
 	t.Run("send_context=success", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			rw.WriteHeader(http.StatusOK)
 			rw.Header().Set("Content-Type", "application/json")
@@ -577,12 +581,12 @@ func TestSendWithContext(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		resp, err := client.SendWithContext(ctx, &Message{
-			To: "test",
+		resp, err := client.SendWithContext(ctx, "token", &NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		})
+		}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -596,8 +600,8 @@ func TestSendWithContext(t *testing.T) {
 
 	t.Run("send_context=timeout", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			if req.Header.Get("Authorization") != "key=test" {
-				t.Fatalf("expected: key=test\ngot: %s", req.Header.Get("Authorization"))
+			if req.Header.Get("Authorization") != "Bearer token" {
+				t.Fatalf("expected: Bearer token\ngot: %s", req.Header.Get("Authorization"))
 			}
 			time.Sleep(time.Millisecond * 100)
 			rw.WriteHeader(http.StatusOK)
@@ -621,12 +625,12 @@ func TestSendWithContext(t *testing.T) {
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*50)
 		defer cancel()
-		_, err = client.SendWithContext(ctx, &Message{
-			To: "test",
+		_, err = client.SendWithContext(ctx, "token", &NewMessage{Message{
+			Topic: "test",
 			Data: map[string]interface{}{
 				"foo": "bar",
 			},
-		})
+		}})
 		if err == nil {
 			t.Fatalf("no context timeout")
 		}

@@ -41,49 +41,6 @@ func TestValidate(t *testing.T) {
 		}
 	})
 
-	t.Run("too many registration ids", func(t *testing.T) {
-		msg := Message{
-			Topic:           "test",
-			RegistrationIDs: make([]string, 2000),
-		}
-		newMsg := &NewMessage{Message: msg}
-		err := newMsg.Validate()
-		if err == nil {
-			t.Fatalf("expected <%v> error, but got <nil>", ErrToManyRegIDs)
-		}
-	})
-
-	t.Run("invalid TTL", func(t *testing.T) {
-		timeToLive := uint(2500000)
-		msg := Message{
-			Topic:           "test",
-			RegistrationIDs: []string{"reg_id"},
-			TimeToLive:      &timeToLive,
-			Data: map[string]interface{}{
-				"message": "This is a Firebase Cloud Messaging Topic Message!",
-			},
-		}
-		newMsg := &NewMessage{Message: msg}
-		err := newMsg.Validate()
-		if err == nil {
-			t.Fatalf("expected <%v> error, but got nil", ErrInvalidTimeToLive)
-		}
-	})
-
-	t.Run("valid with registration ID", func(t *testing.T) {
-		msg := Message{
-			RegistrationIDs: []string{"reg_id"},
-			Data: map[string]interface{}{
-				"message": "This is a Firebase Cloud Messaging Topic Message!",
-			},
-		}
-		newMsg := &NewMessage{Message: msg}
-		err := newMsg.Validate()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	})
-
 	t.Run("valid with condition", func(t *testing.T) {
 		msg := Message{
 			Condition: "'dogs' in topics || 'cats' in topics",

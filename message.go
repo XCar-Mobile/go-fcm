@@ -43,7 +43,6 @@ type Notification struct {
 type Message struct {
 	Topic                 string                 `json:"topic,omitempty"` // Changed from "to" to "topic"
 	Token                 string                 `json:"token,omitempty"`
-	RegistrationIDs       []string               `json:"registration_ids,omitempty"`
 	Condition             string                 `json:"condition,omitempty"`
 	CollapseKey           string                 `json:"collapse_key,omitempty"`
 	Priority              string                 `json:"priority,omitempty"`
@@ -70,13 +69,8 @@ func (msg *NewMessage) Validate() error {
 
 	// validate target identifier: `token`, `topic`, or `condition`
 	opCnt := strings.Count(msg.Message.Condition, "&&") + strings.Count(msg.Message.Condition, "||")
-	if msg.Message.Token == "" && msg.Message.Topic == "" &&
-		(msg.Message.Condition == "" || opCnt > 5) && len(msg.Message.RegistrationIDs) == 0 {
+	if msg.Message.Token == "" && msg.Message.Topic == "" && (msg.Message.Condition == "" || opCnt > 5) {
 		return ErrInvalidTarget
-	}
-
-	if len(msg.Message.RegistrationIDs) > 1000 {
-		return ErrToManyRegIDs
 	}
 
 	if msg.Message.TimeToLive != nil && *msg.Message.TimeToLive > uint(2419200) {

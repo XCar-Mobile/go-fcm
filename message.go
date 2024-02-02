@@ -70,7 +70,8 @@ func (msg *NewMessage) Validate() error {
 
 	// validate target identifier: `token`, `topic`, or `condition`
 	opCnt := strings.Count(msg.Message.Condition, "&&") + strings.Count(msg.Message.Condition, "||")
-	if msg.Message.Token == "" && msg.Message.Topic == "" && (msg.Message.Condition == "" || opCnt > 5) {
+	if msg.Message.Token == "" && msg.Message.Topic == "" &&
+		(msg.Message.Condition == "" || opCnt > 5) && len(msg.Message.RegistrationIDs) == 0 {
 		return ErrInvalidTarget
 	}
 

@@ -135,7 +135,8 @@ func (r *Response) UnmarshalJSON(data []byte) error {
 // If no error is present (i.e. r.Error is nil), Err returns nil.
 //
 // The function iterates over the error details provided in r.Error.Details to extract a specific
-// error code. It checks each detail, and if a detail has a Type equal to errTypeFCMError, that detail’s
+// error code. It checks each detail, and if a detail has a Type equal to
+// "type.googleapis.com/google.firebase.fcm.v1.FcmError", that detail’s
 // ErrorCode is used. If no matching detail is found, it defaults to ErrorCodeUnspecifiedError.
 //
 // The returned error is formatted as follows:

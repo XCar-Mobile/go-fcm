@@ -2,19 +2,7 @@ package fcm
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
-)
-
-// FCM HTTP v1 error variables.
-var (
-	ErrInvalidParameters   = errors.New("invalid parameters")
-	ErrAuthentication      = errors.New("authentication error")
-	ErrPermissionDenied    = errors.New("permission denied")
-	ErrNotFound            = errors.New("not found")
-	ErrInternalServerError = errors.New("internal server error")
-	ErrUnavailable         = errors.New("service unavailable")
-	ErrUnknown             = errors.New("unknown error")
 )
 
 const (
@@ -143,6 +131,16 @@ func (r *Response) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Err returns an error that summarizes the FCM error contained in the Response.
+// If no error is present (i.e. r.Error is nil), Err returns nil.
+//
+// The function iterates over the error details provided in r.Error.Details to extract a specific
+// error code. It checks each detail, and if a detail has a Type equal to errTypeFCMError, that detail’s
+// ErrorCode is used. If no matching detail is found, it defaults to ErrorCodeUnspecifiedError.
+//
+// The returned error is formatted as follows:
+//
+//	"FCM error (<status> | <errorCode>): <errorMessage>"
 func (r *Response) Err() error {
 	if r.Error == nil {
 		return nil

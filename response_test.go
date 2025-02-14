@@ -99,9 +99,9 @@ func TestUnmarshalUnknownErrorResponse(t *testing.T) {
 	}
 
 	errMapped := response.Err()
-	expectedErrMsg := "FCM error (SOME_UNKNOWN_STATUS): UNSPECIFIED_ERROR, Some unexpected error occurred"
+	expectedErrMsg := "FCM error (SOME_UNKNOWN_STATUS | UNSPECIFIED_ERROR): Some unexpected error occurred"
 	if errMapped.Error() != expectedErrMsg {
-		t.Errorf("expected mapped error to be %q, got %q", expectedErrMsg, errMapped.Error())
+		t.Errorf("expected error to be %q, got %q", expectedErrMsg, errMapped.Error())
 	}
 }
 

@@ -3,78 +3,65 @@ package fcm
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
+// FCM HTTP v1 error variables.
 var (
-	// ErrMissingRegistration occurs if registration token is not set.
-	ErrMissingRegistration = errors.New("missing registration token")
-
-	// ErrInvalidRegistration occurs if registration token is invalid.
-	ErrInvalidRegistration = errors.New("invalid registration token")
-
-	// ErrNotRegistered occurs when application was deleted from device and
-	// token is not registered in FCM.
-	ErrNotRegistered = errors.New("unregistered device")
-
-	// ErrInvalidPackageName occurs if package name in message is invalid.
-	ErrInvalidPackageName = errors.New("invalid package name")
-
-	// ErrMismatchSenderID occurs when application has a new registration token.
-	ErrMismatchSenderID = errors.New("mismatched sender id")
-
-	// ErrMessageTooBig occurs when message is too big.
-	ErrMessageTooBig = errors.New("message is too big")
-
-	// ErrInvalidDataKey occurs if data key is invalid.
-	ErrInvalidDataKey = errors.New("invalid data key")
-
-	// ErrInvalidTTL occurs when message has invalid TTL.
-	ErrInvalidTTL = errors.New("invalid time to live")
-
-	// ErrUnavailable occurs when FCM service is unavailable. It makes sense
-	// to retry after this error.
-	ErrUnavailable = connectionError("timeout")
-
-	// ErrInternalServerError is internal FCM error. It makes sense to retry
-	// after this error.
-	ErrInternalServerError = serverError("internal server error")
-
-	// ErrDeviceMessageRateExceeded occurs when client sent to many requests to
-	// the device.
-	ErrDeviceMessageRateExceeded = errors.New("device message rate exceeded")
-
-	// ErrTopicsMessageRateExceeded occurs when client sent to many requests to
-	// the topics.
-	ErrTopicsMessageRateExceeded = errors.New("topics message rate exceeded")
-
-	// ErrInvalidParameters occurs when provided parameters have the right name and type
-	ErrInvalidParameters = errors.New("check that the provided parameters have the right name and type")
-
-	// ErrUnknown for unknown error type
-	ErrUnknown = errors.New("unknown error type")
-
-	// ErrInvalidApnsCredential for Invalid APNs credentials
-	ErrInvalidApnsCredential = errors.New("invalid APNs credentials")
+	ErrInvalidParameters   = errors.New("invalid parameters")
+	ErrAuthentication      = errors.New("authentication error")
+	ErrPermissionDenied    = errors.New("permission denied")
+	ErrNotFound            = errors.New("not found")
+	ErrInternalServerError = errors.New("internal server error")
+	ErrUnavailable         = errors.New("service unavailable")
+	ErrUnknown             = errors.New("unknown error")
 )
 
-var (
-	errMap = map[string]error{
-		"MissingRegistration":       ErrMissingRegistration,
-		"InvalidRegistration":       ErrInvalidRegistration,
-		"NotRegistered":             ErrNotRegistered,
-		"InvalidPackageName":        ErrInvalidPackageName,
-		"MismatchSenderId":          ErrMismatchSenderID,
-		"MessageTooBig":             ErrMessageTooBig,
-		"InvalidDataKey":            ErrInvalidDataKey,
-		"InvalidTtl":                ErrInvalidTTL,
-		"Unavailable":               ErrUnavailable,
-		"InternalServerError":       ErrInternalServerError,
-		"DeviceMessageRateExceeded": ErrDeviceMessageRateExceeded,
-		"TopicsMessageRateExceeded": ErrTopicsMessageRateExceeded,
-		"InvalidParameters":         ErrInvalidParameters,
-		"InvalidApnsCredential":     ErrInvalidApnsCredential,
-	}
+const (
+	// No more information is available about this error.
+	ErrorCodeUnspecifiedError = "UNSPECIFIED_ERROR"
+
+	// HTTP error code = 400
+	//
+	// Request parameters were invalid. An extension of type
+	// google.rpc.BadRequest is returned to specify which field was invalid.
+	ErrorCodeInvalidArgument = "INVALID_ARGUMENT"
+
+	// HTTP error code = 404
+	//
+	// App instance was unregistered from FCM. This usually means that the token
+	// used is no longer valid and a new one must be used.
+	ErrorCodeUnregistered = "UNREGISTERED"
+
+	// HTTP error code = 403
+	//
+	// The authenticated sender ID is different from the sender ID
+	// for the registration token.
+	ErrorCodeSenderIdMismatch = "SENDER_ID_MISMATCH"
+
+	// HTTP error code = 429
+	//
+	// Sending limit exceeded for the message target. An extension of type
+	// google.rpc.QuotaFailure is returned to specify which quota was exceeded.
+	ErrorCodeQuotaExceeded = "QUOTA_EXCEEDED"
+
+	// HTTP error code = 503
+	//
+	// The server is overloaded.
+	ErrorCodeUnavailable = "UNAVAILABLE"
+
+	// HTTP error code = 500
+	//
+	// An unknown internal error occurred.
+	ErrorCodeInternal = "INTERNAL"
+
+	// HTTP error code = 401
+	//
+	// APNs certificate or web push auth key was invalid or missing.
+	ErrorCodeThirdPartyAuthError = "THIRD_PARTY_AUTH_ERROR"
 )
+
+const errTypeFCMError = "type.googleapis.com/google.firebase.fcm.v1.FcmError"
 
 // connectionError represents connection errors such as timeout error, etc.
 // Implements `net.Error` interface.
@@ -108,107 +95,69 @@ func (serverError) Timeout() bool {
 	return false
 }
 
-// Response represents the FCM server's response to the application
-// server's sent message.
-type Response struct {
-	MulticastID  int64    `json:"multicast_id"`
-	Success      int      `json:"success"`
-	Failure      int      `json:"failure"`
-	CanonicalIDs int      `json:"canonical_ids"`
-	Results      []Result `json:"results"`
+type (
+	// Response represents the FCM HTTP v1 server response.
+	// On success, the response contains the "name" field (a string like "projects/myproject/messages/123").
+	// On failure, the response contains an "error" field following the google.rpc.Status format.
+	Response struct {
+		// Success response: the server returns the fully qualified message name.
+		Name string `json:"name,omitempty"`
+		// Error response: see google.rpc.Status for details.
+		Error *ResponseError `json:"error,omitempty"`
+	}
 
-	// Device Group HTTP Response
-	FailedRegistrationIDs []string `json:"failed_registration_ids"`
+	// ResponseError represents the error structure returned by the FCM HTTP v1 API.
+	ResponseError struct {
+		Code    int                   `json:"code"`
+		Message string                `json:"message"`
+		Status  string                `json:"status"`
+		Details []ResponseErrorDetail `json:"details,omitempty"`
+	}
 
-	// Topic HTTP response
-	MessageID         int64 `json:"message_id"`
-	Error             error `json:"error"`
-	ErrorResponseCode string
-}
+	// ResponseErrorDetail represents additional details that may be provided with an error.
+	ResponseErrorDetail struct {
+		// The fully qualified type of the error detail.
+		Type string `json:"@type"`
+		// An error code specific to the FCM API (if provided).
+		ErrorCode string `json:"errorCode,omitempty"`
+		// For some errors, details about which field(s) are invalid.
+		FieldViolations []ResponseErrorFieldViolation `json:"fieldViolations,omitempty"`
+	}
 
-// UnmarshalJSON implements json.Unmarshaler interface.
+	// ResponseErrorFieldViolation provides details about an individual field error.
+	ResponseErrorFieldViolation struct {
+		Field       string `json:"field"`
+		Description string `json:"description"`
+	}
+)
+
+// UnmarshalJSON implements custom unmarshalling for Response.
+// It simply decodes the JSON into the Response struct.
 func (r *Response) UnmarshalJSON(data []byte) error {
-	var response struct {
-		MulticastID  int64    `json:"multicast_id"`
-		Success      int      `json:"success"`
-		Failure      int      `json:"failure"`
-		CanonicalIDs int      `json:"canonical_ids"`
-		Results      []Result `json:"results"`
-
-		// Device Group HTTP Response
-		FailedRegistrationIDs []string `json:"failed_registration_ids"`
-
-		// Topic HTTP response
-		MessageID int64  `json:"message_id"`
-		Error     string `json:"error"`
-	}
-
-	if err := json.Unmarshal(data, &response); err != nil {
+	type respAlias Response
+	var temp respAlias
+	if err := json.Unmarshal(data, &temp); err != nil {
 		return err
 	}
-
-	r.MulticastID = response.MulticastID
-	r.Success = response.Success
-	r.Failure = response.Failure
-	r.CanonicalIDs = response.CanonicalIDs
-	r.Results = response.Results
-	r.FailedRegistrationIDs = response.FailedRegistrationIDs
-	r.MessageID = response.MessageID
-	r.ErrorResponseCode = response.Error
-	if response.Error != "" {
-		if val, ok := errMap[response.Error]; ok {
-			r.Error = val
-		} else {
-			r.Error = ErrUnknown
-		}
-	}
-
+	*r = Response(temp)
 	return nil
 }
 
-// Result represents the status of a processed message.
-type Result struct {
-	MessageID         string `json:"message_id"`
-	RegistrationID    string `json:"registration_id"`
-	Error             error  `json:"error"`
-	ErrorResponseCode string
-}
-
-// UnmarshalJSON implements json.Unmarshaler interface.
-func (r *Result) UnmarshalJSON(data []byte) error {
-	var result struct {
-		MessageID      string `json:"message_id"`
-		RegistrationID string `json:"registration_id"`
-		Error          string `json:"error"`
+func (r *Response) Err() error {
+	if r.Error == nil {
+		return nil
 	}
 
-	if err := json.Unmarshal(data, &result); err != nil {
-		return err
-	}
+	errCode := ErrorCodeUnspecifiedError
+	for _, detail := range r.Error.Details {
+		errCode = detail.ErrorCode
 
-	r.MessageID = result.MessageID
-	r.RegistrationID = result.RegistrationID
-	r.ErrorResponseCode = result.Error
-	if result.Error != "" {
-		if val, ok := errMap[result.Error]; ok {
-			r.Error = val
-		} else {
-			r.Error = ErrUnknown
+		if detail.Type == errTypeFCMError {
+			errCode = detail.ErrorCode
+			break
 		}
 	}
 
-	return nil
-}
-
-// Unregistered checks if the device token is unregistered,
-// according to response from FCM server. Useful to determine
-// if app is uninstalled.
-func (r Result) Unregistered() bool {
-	switch r.Error {
-	case ErrNotRegistered, ErrMismatchSenderID, ErrMissingRegistration, ErrInvalidRegistration:
-		return true
-
-	default:
-		return false
-	}
+	return fmt.Errorf("FCM error (%s | %s): %s",
+		r.Error.Status, errCode, r.Error.Message)
 }

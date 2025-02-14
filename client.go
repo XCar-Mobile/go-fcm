@@ -133,12 +133,8 @@ func (c *Client) send(ctx context.Context, accessToken string, data []byte) (*Re
 	}
 	defer resp.Body.Close()
 
-	// check response status
-	if resp.StatusCode != http.StatusOK {
-		if resp.StatusCode >= http.StatusInternalServerError {
-			return nil, serverError(fmt.Sprintf("%d error: %s", resp.StatusCode, resp.Status))
-		}
-		return nil, fmt.Errorf("%d error: %s", resp.StatusCode, resp.Status)
+	if err := handleFCMResponse(resp); err != nil {
+		return nil, err
 	}
 
 	// build return
@@ -148,4 +144,25 @@ func (c *Client) send(ctx context.Context, accessToken string, data []byte) (*Re
 	}
 
 	return response, nil
+}
+
+// handleFCMResponse processes the HTTP response.
+// For a 200 OK response, it does nothing.
+// For error responses, it decodes the error JSON (which follows the google.rpc.Status format)
+// and returns an error containing the status and message.
+func handleFCMResponse(resp *http.Response) error {
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	if resp.StatusCode >= http.StatusInternalServerError {
+		return serverError(fmt.Sprintf("%d error: %s", resp.StatusCode, resp.Status))
+	}
+
+	var response Response
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return fmt.Errorf("failed to decode error response: %w", err)
+	}
+
+	return response.Err()
 }
